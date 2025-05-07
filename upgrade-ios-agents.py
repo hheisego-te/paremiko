@@ -1,11 +1,9 @@
-import re
 from netmiko import ConnectHandler, NetmikoTimeoutException, NetmikoAuthenticationException
 from getpass import getpass
-
+import re
 
 # File with list of IPs
 with open("device_list.txt", "r") as f:
-    
     device_ips = [line.strip() for line in f if line.strip()]
 
 USERNAME = input("Username: ")
@@ -14,10 +12,8 @@ PASSWORD = getpass("Password: ")
 file_url = "https://downloads.thousandeyes.com/enterprise-agent/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar"
 destination_folder = "bootflash:/te-apps"
 destination_file = f"{destination_folder}/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar"
-upgrade_command = f"app-hosting upgrade appid TE_Agent package {destination_file}"
 
 for ip in device_ips:
-
     print(f"\n[INFO] Connecting to {ip}...")
 
     cisco_device = {
@@ -28,47 +24,60 @@ for ip in device_ips:
     }
 
     try:
-
+        
         net_connect = ConnectHandler(**cisco_device)
 
-        # Check if directory exists
-        dir_output = net_connect.send_command(f"dir {destination_folder}", use_textfsm=True)
+        # Step 1: Detect App ID from `show app-hosting list`
+        print("[INFO] Retrieving App ID...")
+        app_list_output = net_connect.send_command("show app-hosting list")
+        app_id_match = re.search(r"^(\S+)\s+RUNNING", app_list_output, re.MULTILINE)
+
+        if not app_id_match:
+            
+            print("[WARNING] No running app found. Skipping device.")
+            net_connect.disconnect()
+            continue
+
+        app_id = app_id_match.group(1)
+        print(f"[INFO] Found app ID: {app_id}")
+
+        upgrade_command = f"app-hosting upgrade appid {app_id} package {destination_file}"
+
+        # Step 2: Ensure directory exists
+        dir_output = net_connect.send_command(f"dir {destination_folder}")
         if "not a directory" in dir_output or "No such file" in dir_output:
-        
+            
             print(f"[INFO] Directory not found. Creating {destination_folder}")
             net_connect.send_command(f"mkdir {destination_folder}")
 
-        # Check for HTTPS issues
+        # Step 3: Validate URL
         if "urldefense" in file_url.lower() or "__" in file_url:
-        
+            
             print("[WARNING] Obfuscated URL detected. Skipping.")
             net_connect.disconnect()
             continue
 
-        # Copy the file
+        # Step 4: Copy image
         print(f"[INFO] Copying image to {destination_file}")
         net_connect.send_command("file prompt quiet")
         output = net_connect.send_command_timing(f"copy {file_url} {destination_file}", strip_prompt=False, strip_command=False)
 
         if "Destination filename" in output:
-        
+            
             output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
 
         if "[confirm]" in output or "overwrite" in output.lower():
-        
+            
             output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
 
         print("[INFO] Copy complete.")
 
-        # Upgrade the app
-        print("[INFO] Running upgrade command !!!!")
-        
+        # Step 5: Upgrade app
+        print(f"[INFO] Running upgrade command for {app_id}...")
         upgrade_output = net_connect.send_command(upgrade_command)
-        
         print(upgrade_output)
 
         # Disconnect
-        print("[--] Disconnecting ...!")
         net_connect.disconnect()
         print(f"[OK] Finished with {ip}")
 
