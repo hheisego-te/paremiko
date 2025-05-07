@@ -87,7 +87,7 @@ for ip in device_ips:
             
             output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
 
-        print("[INFO] Copy complete.")
+        print(f"[INFO] Copy complete. \n{output}")
 
         # Step 5: Upgrade app
         print(f"[INFO] Running upgrade command for {app_id}...")
