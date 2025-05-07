@@ -15,6 +15,7 @@ destination_folder = "bootflash:/te-apps"
 destination_file = f"{destination_folder}/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar"
 
 for ip in device_ips:
+
     print(f"\n[INFO] Connecting to {ip}...")
 
     cisco_device = {
@@ -57,7 +58,7 @@ for ip in device_ips:
 
             print(f"[INFO] Directory not found. Creating {destination_folder}")
 
-            mkdir_output = net_connect.send_command_timing(f"mkdir {destination_folder}", strip_prompt=False, strip_command=False, delay_factor=5)
+            mkdir_output = net_connect.send_command_timing(f"mkdir {destination_folder}", strip_prompt=False, strip_command=False, delay_factor=10)
             
             # this confirm was missing?
             if '[confirm]' in mkdir_output or 'confirm' in mkdir_output.lower():
@@ -76,7 +77,7 @@ for ip in device_ips:
         # Step 4: Copy image
         print(f"[INFO] Copying image to {destination_file}")
        
-        output = net_connect.send_command_timing(f"copy {file_url} {destination_file}", strip_prompt=False, strip_command=False)
+        output = net_connect.send_command_timing(f"copy {file_url} {destination_file}", strip_prompt=False, strip_command=False, delay_factor=20)
 
         if "Destination filename" in output:
             
@@ -91,7 +92,7 @@ for ip in device_ips:
         # Step 5: Upgrade app
         print(f"[INFO] Running upgrade command for {app_id}...")
 
-        upgrade_output = net_connect.send_command(upgrade_command)
+        upgrade_output = net_connect.send_command(upgrade_command, delay_factor=15)
         
         print(upgrade_output)
 
@@ -106,3 +107,24 @@ for ip in device_ips:
     except Exception as general_error:
         
         print(f"[ERROR] Unexpected error on {ip}: {general_error}")
+
+
+
+"""
+caagh-1000eyes-temp-as1# caagh-1000eyes-temp-as1#terminal width 511 caagh-1000eyes-temp-as1#terminal length 0 caagh-1000eyes-temp-as1# caagh-1000eyes-temp-as1# caagh-1000eyes-temp-as1#show app-hosting list App id State
+CAAGH_TE RUNNING
+caagh-1000eyes-temp-as1#
+caagh-1000eyes-temp-as1#dir bootflash:/te-apps
+%Error opening flash:/te-apps (No such file or directory)
+caagh-1000eyes-temp-as1#mkdir bootflash:/te-apps
+Create directory filename [te-apps]?
+Created dir flash:/te-apps
+caagh-1000eyes-temp-as1#
+
+caagh-1000eyes-temp-as1#copy https://downloads.thousandeyes.com/enterprise-agent/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar bootflash:/te-apps/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar
+Destination filename [/te-apps/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar]?
+Accessing https://downloads.thousandeyes.com/enterprise-agent/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar...
+Loading https://downloads.thousandeyes.com/enterprise-agent/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+"""
