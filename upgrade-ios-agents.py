@@ -36,13 +36,15 @@ for ip in device_ips:
         app_id_match = re.search(r"^(\S+)\s+RUNNING", app_list_output, re.MULTILINE)
 
         app_id = app_id_match.group(1)
-        print(f"[INFO] Found app ID: {app_id}")
-
         if not app_id_match:
-            
-            print("[WARNING] No running app found. using TE-Agent.")
-            
+
+            print("[WARNING] No running app found. Using TE-Agent.")
             app_id = "TE-Agent"
+
+        else:
+
+            app_id = app_id_match.group(1)
+            print(f"[INFO] Found app ID: {app_id}")
 
 
         upgrade_command = f"app-hosting upgrade appid {app_id} package {destination_file}"
@@ -51,7 +53,7 @@ for ip in device_ips:
         dir_output = net_connect.send_command(f"dir {destination_folder}")
         print(f"[DEBUG] dir {destination_folder} →\n{dir_output}")
 
-        if "not a directory" in dir_output or "No such file" in dir_output:
+        if "not a directory" in dir_output or "No such file" in dir_output or "%Error opening" in dir_output:
 
             print(f"[INFO] Directory not found. Creating {destination_folder}")
 
@@ -73,7 +75,7 @@ for ip in device_ips:
 
         # Step 4: Copy image
         print(f"[INFO] Copying image to {destination_file}")
-        net_connect.send_command("file prompt quiet")
+       
         output = net_connect.send_command_timing(f"copy {file_url} {destination_file}", strip_prompt=False, strip_command=False)
 
         if "Destination filename" in output:
