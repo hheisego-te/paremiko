@@ -35,24 +35,34 @@ for ip in device_ips:
         app_list_output = net_connect.send_command("show app-hosting list")
         app_id_match = re.search(r"^(\S+)\s+RUNNING", app_list_output, re.MULTILINE)
 
-        if not app_id_match:
-            
-            print("[WARNING] No running app found. Skipping device.")
-            net_connect.disconnect()
-            continue
-
         app_id = app_id_match.group(1)
         print(f"[INFO] Found app ID: {app_id}")
+
+        if not app_id_match:
+            
+            print("[WARNING] No running app found. using TE-Agent.")
+            
+            app_id = "TE-Agent"
+
 
         upgrade_command = f"app-hosting upgrade appid {app_id} package {destination_file}"
 
         # Step 2: Ensure directory exists
         dir_output = net_connect.send_command(f"dir {destination_folder}")
+        print(f"[DEBUG] dir {destination_folder} →\n{dir_output}")
+
         if "not a directory" in dir_output or "No such file" in dir_output:
-            
+
             print(f"[INFO] Directory not found. Creating {destination_folder}")
 
-            net_connect.send_command_timing(f"mkdir {destination_folder}", delay_factor=5)
+            mkdir_output = net_connect.send_command_timing(f"mkdir {destination_folder}", strip_prompt=False, strip_command=False, delay_factor=5)
+            
+            # this confirm was missing?
+            if '[confirm]' in mkdir_output or 'confirm' in mkdir_output.lower():
+
+                mkdir_output += net_connect.send_command_timing('\n', strip_prompt=False, strip_command=False)
+
+            print(f"[DEBUG] mkdir output →\n{mkdir_output}")
 
         # Step 3: Validate URL
         if "urldefense" in file_url.lower() or "__" in file_url:
@@ -78,7 +88,9 @@ for ip in device_ips:
 
         # Step 5: Upgrade app
         print(f"[INFO] Running upgrade command for {app_id}...")
+
         upgrade_output = net_connect.send_command(upgrade_command)
+        
         print(upgrade_output)
 
         # Disconnect
