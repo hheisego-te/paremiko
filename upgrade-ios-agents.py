@@ -1,6 +1,7 @@
+import re
 from netmiko import ConnectHandler, NetmikoTimeoutException, NetmikoAuthenticationException
 from getpass import getpass
-import re
+
 
 # File with list of IPs
 with open("device_list.txt", "r") as f:
@@ -24,7 +25,7 @@ for ip in device_ips:
     }
 
     try:
-        
+
         net_connect = ConnectHandler(**cisco_device)
 
         # Step 1: Detect App ID from `show app-hosting list`
