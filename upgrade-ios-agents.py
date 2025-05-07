@@ -61,7 +61,7 @@ for ip in device_ips:
             mkdir_output = net_connect.send_command_timing(f"mkdir {destination_folder}", strip_prompt=False, strip_command=False, delay_factor=10)
             
             # this confirm was missing?
-            if '[confirm]' in mkdir_output or 'confirm' in mkdir_output.lower():
+            if '[te-apps]' in mkdir_output or 'confirm' in mkdir_output.lower():
 
                 mkdir_output += net_connect.send_command_timing('\n', strip_prompt=False, strip_command=False)
 
