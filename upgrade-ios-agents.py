@@ -58,7 +58,7 @@ for ip in device_ips:
 
             print(f"[INFO] Directory not found. Creating {destination_folder}")
 
-            mkdir_output = net_connect.send_command_timing(f"mkdir {destination_folder}", strip_prompt=False, strip_command=False, delay_factor=10)
+            mkdir_output = net_connect.send_command_timing(f"mkdir {destination_folder}", strip_prompt=False, strip_command=False, delay_factor=5)
             
             # this confirm was missing?
             if '[te-apps]' in mkdir_output or 'confirm' in mkdir_output.lower():
@@ -77,7 +77,7 @@ for ip in device_ips:
         # Step 4: Copy image
         print(f"[INFO] Copying image to {destination_file}")
        
-        output = net_connect.send_command_timing(f"copy {file_url} {destination_file}", strip_prompt=False, strip_command=False, delay_factor=20)
+        output = net_connect.send_command_timing(f"copy {file_url} {destination_file}", strip_prompt=False, strip_command=False, delay_factor=10)
 
         if "Destination filename" in output:
             
@@ -92,9 +92,13 @@ for ip in device_ips:
         # Step 5: Upgrade app
         print(f"[INFO] Running upgrade command for {app_id}...")
 
-        upgrade_output = net_connect.send_command(upgrade_command, delay_factor=15)
+        upgrade_output = net_connect.send_command(upgrade_command, strip_prompt=False, strip_command=False, delay_factor=15)
         
-        print(upgrade_output)
+        if "[confirm]" in upgrade_output.lower():
+        
+            upgrade_output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
+        
+        print(f"[DEBUG] upgrade →\n{upgrade_output}")
 
         # Disconnect
         net_connect.disconnect()
