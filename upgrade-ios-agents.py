@@ -1,65 +1,81 @@
+import re
 from netmiko import ConnectHandler, NetmikoTimeoutException, NetmikoAuthenticationException
 from getpass import getpass
-import re
 
-# Prompt user
-device_ip = input("What device do you need to modify (IP address)? ")
-USERNAME = input("What username would you like to use for login? ")
-PASSWORD = getpass("What password is used for this account? ")
 
-# Connection parameters
-cisco_device = {
-    "device_type": "cisco_ios",
-    "ip": device_ip,
-    "username": USERNAME,
-    "password": PASSWORD,
-}
+# File with list of IPs
+with open("device_list.txt", "r") as f:
+    
+    device_ips = [line.strip() for line in f if line.strip()]
 
-try:
-    net_connect = ConnectHandler(**cisco_device)
-except (NetmikoTimeoutException, NetmikoAuthenticationException) as error:
-    print(f"Connection failed: {error}")
-    exit(1)
-except Exception as general_error:
-    print(f"An unexpected error occurred: {general_error}")
-    exit(1)
+USERNAME = input("Username: ")
+PASSWORD = getpass("Password: ")
 
-# Define URL
 file_url = "https://downloads.thousandeyes.com/enterprise-agent/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar"
-destination = "bootflash:/apps"
+destination_folder = "bootflash:/te-apps"
+destination_file = f"{destination_folder}/thousandeyes-enterprise-agent-x86_64-5.0.1.cisco.tar"
+upgrade_command = f"app-hosting upgrade appid TE_Agent package {destination_file}"
 
-# Extra: Verificar si la URL es limpia
-if "urldefense" in file_url.lower() or "__" in file_url:
-    print("Warning: URL seems obfuscated by a security system (urldefense). Please use a clean URL.")
-    exit(1)
+for ip in device_ips:
 
-copy_command = f"copy {file_url} {destination}"
+    print(f"\n[INFO] Connecting to {ip}...")
 
-print(f"Running copy command: {copy_command}")
+    cisco_device = {
+        "device_type": "cisco_ios",
+        "ip": ip,
+        "username": USERNAME,
+        "password": PASSWORD,
+    }
 
-# Disable confirmation prompts temporarily
-net_connect.send_command("file prompt quiet")
+    try:
 
-# Send the copy command in raw timing mode
-output = net_connect.send_command_timing(copy_command, strip_prompt=False, strip_command=False)
+        net_connect = ConnectHandler(**cisco_device)
 
-print("Initial output after sending copy:")
-print(repr(output))
+        # Check if directory exists
+        dir_output = net_connect.send_command(f"dir {destination_folder}", use_textfsm=True)
+        if "not a directory" in dir_output or "No such file" in dir_output:
+        
+            print(f"[INFO] Directory not found. Creating {destination_folder}")
+            net_connect.send_command(f"mkdir {destination_folder}")
 
-# Handle prompts
-if "Destination filename" in output:
-    output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
-    print("Responded to Destination filename prompt.")
+        # Check for HTTPS issues
+        if "urldefense" in file_url.lower() or "__" in file_url:
+        
+            print("[WARNING] Obfuscated URL detected. Skipping.")
+            net_connect.disconnect()
+            continue
 
-if "[confirm]" in output or "overwrite" in output.lower():
-    output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
-    print("Responded to overwrite/confirm prompt.")
+        # Copy the file
+        print(f"[INFO] Copying image to {destination_file}")
+        net_connect.send_command("file prompt quiet")
+        output = net_connect.send_command_timing(f"copy {file_url} {destination_file}", strip_prompt=False, strip_command=False)
 
-# Final output
-print("Final output:")
-print(output)
+        if "Destination filename" in output:
+        
+            output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
 
-# Restore normal file prompt behavior if needed (optional)
-# net_connect.send_command("file prompt alert")
+        if "[confirm]" in output or "overwrite" in output.lower():
+        
+            output += net_connect.send_command_timing("\n", strip_prompt=False, strip_command=False)
 
-net_connect.disconnect()
+        print("[INFO] Copy complete.")
+
+        # Upgrade the app
+        print("[INFO] Running upgrade command !!!!")
+        
+        upgrade_output = net_connect.send_command(upgrade_command)
+        
+        print(upgrade_output)
+
+        # Disconnect
+        print("[--] Disconnecting ...!")
+        net_connect.disconnect()
+        print(f"[OK] Finished with {ip}")
+
+    except (NetmikoTimeoutException, NetmikoAuthenticationException) as error:
+        
+        print(f"[ERROR] Connection failed for {ip}: {error}")
+    
+    except Exception as general_error:
+        
+        print(f"[ERROR] Unexpected error on {ip}: {general_error}")
